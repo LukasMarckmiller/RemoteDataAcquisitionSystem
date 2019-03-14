@@ -1,4 +1,4 @@
-# RemoteDataAcquisitionSystem
+# RemoteForensicAppliance
 Bachelorarbeit Informatik 2019 - To be done
 ##Abstract https://de.overleaf.com/read/zwhdhvygmjvm
 Stand 12.03.2018
