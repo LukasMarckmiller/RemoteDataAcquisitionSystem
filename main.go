@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
 var router *gin.Engine
@@ -13,15 +12,11 @@ func main() {
 	//Load static html content
 	router.LoadHTMLGlob("web/templates/*")
 	// Define Simple test route
-	router.GET("/", func(context *gin.Context) {
-		context.HTML(
-			http.StatusOK,
-			"index.html",
-			gin.H{
-				"title": "Demo App",
-			})
-	})
+	initRoutes()
+
+	//Hardware Rec
+	printBlockStorageInfo()
 
 	router.Run()
-	//router.RunTLS("127.0.0.1:5443","","")
+	//router.RunTLS(":5443", "/etc/ssl/certs/server.crt","/etc/ssl/private/server.key")
 }
