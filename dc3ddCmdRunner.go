@@ -12,8 +12,6 @@ import (
 type ImageJob struct {
 	Running        bool
 	Id             string
-	CIf            chan string
-	COf            chan string
 	CIfcachedValue string
 	COfCachedValue string
 }
@@ -33,7 +31,7 @@ func (i *ImageJob) runDc3dd(dev string) {
 	r, w, err := os.Pipe()
 	defer r.Close()
 
-	commandIf := path + " if=/home/lukas/test.txt verb=on log=/home/lukas/dc3ddTest/sdb1Img.log"
+	commandIf := path + " if=" + dev + " verb=on log=/home/lukas/dc3ddTest/sdb1Img.log"
 	commandOf := "ssh lab01@192.168.0.10 -t \"dc3dd verb=on of=/home/lab01/sdb1/sda1.img \""
 
 	cmdIf := exec.Command("sh", "-c", commandIf)
@@ -79,7 +77,7 @@ func (i *ImageJob) runDc3dd(dev string) {
 	go func() {
 		//		defer wg.Done()
 		defer fmt.Println("StderrOf done")
-
+		defer r.Close()
 		scanner := bufio.NewScanner(readerStderrOf)
 		for scanner.Scan() {
 			m := scanner.Text()

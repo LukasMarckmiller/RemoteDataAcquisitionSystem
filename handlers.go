@@ -51,10 +51,13 @@ func getMountedMediaById(context *gin.Context) {
 }
 
 func createAndStartImageJob(context *gin.Context) {
-	cOf := make(chan string)
-	cIf := make(chan string)
-	job := ImageJob{Id: uuid.NewV4().String(), CIf: cIf, COf: cOf}
-	go job.runDc3dd(context.PostForm("path"))
+	var imageJobRequestPresentation ImageJobRequestPresentationType
+
+	job := ImageJob{Id: uuid.NewV4().String()}
+	context.BindJSON(&imageJobRequestPresentation)
+	devPath := imageJobRequestPresentation.Path
+
+	go job.runDc3dd(devPath)
 	jobs[job.Id] = &job
 
 	context.JSON(http.StatusOK, job.Id)
@@ -77,4 +80,8 @@ type ImageJobPresentationType struct {
 	CommandIfOutput string `json:"commandIfOutput"`
 	Running         bool   `json:"running"`
 	Id              string `json:"id"`
+}
+
+type ImageJobRequestPresentationType struct {
+	Path string `json:"path"`
 }
