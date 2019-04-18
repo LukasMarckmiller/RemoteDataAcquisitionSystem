@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/semihalev/gin-stats"
 	"github.com/twinj/uuid"
 	"net/http"
 	"strconv"
@@ -73,7 +74,11 @@ func getImageJobById(context *gin.Context) {
 	context.JSON(http.StatusOK, ImageJobPresentationType{CommandOfOutput: elem.COfCachedValue, CommandIfOutput: elem.CIfcachedValue, Running: elem.Running, Id: elem.Id})
 }
 
-//Implement cache cleaning for ImageJobs
+func getStatInfo(context *gin.Context) {
+	context.JSON(http.StatusOK, stats.Report())
+}
+
+//TODO Implement cache cleaning for ImageJobs
 
 type ImageJobPresentationType struct {
 	CommandOfOutput string `json:"commandOfOutput"`

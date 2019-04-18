@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/semihalev/gin-stats"
 )
 
 var router *gin.Engine
@@ -18,6 +19,8 @@ func main() {
 	/*USE ONLY FOR LAB ENVIRONMENT, BUILD OWN CONFIG FOR PRODUCTIVE BUILD:
 	https://github.com/gin-contrib/cors*/
 	router.Use(cors.Default())
+
+	router.Use(stats.RequestStats())
 
 	// Define Simple test route
 	initRoutes()
@@ -37,6 +40,8 @@ func main() {
 }
 
 /*
+DC3DD needs to be installed on client and server
+
 To avoid password prompting for ssh while using dd or dc3dd generate ssh key pair and share to client:
 
 $ ssh-keygen -t rsa -b 2048

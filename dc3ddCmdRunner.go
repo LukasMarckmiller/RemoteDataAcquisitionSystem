@@ -31,8 +31,8 @@ func (i *ImageJob) runDc3dd(dev string) {
 	r, w, err := os.Pipe()
 	defer r.Close()
 
-	commandIf := path + " if=" + dev + " verb=on log=/home/lukas/dc3ddTest/sdb1Img.log"
-	commandOf := "ssh lab01@192.168.0.10 -t \"dc3dd verb=on of=/home/lab01/sdb1/sda1.img \""
+	commandIf := path + " if=/home/lukas/" + dev + " verb=on log=/home/lukas/dc3ddTest/sdb1Img.log"
+	commandOf := "ssh lab02@192.168.0.9 -C \"dc3dd verb=on of=/home/lab02/sdb1/" + dev + ".img\""
 
 	cmdIf := exec.Command("sh", "-c", commandIf)
 	cmdIf.Stdout = w
@@ -79,9 +79,11 @@ func (i *ImageJob) runDc3dd(dev string) {
 		defer fmt.Println("StderrOf done")
 		defer r.Close()
 		scanner := bufio.NewScanner(readerStderrOf)
+
 		for scanner.Scan() {
 			m := scanner.Text()
 			commandOfOutput.WriteString(m)
+			commandOfOutput.WriteString("\n")
 			i.COfCachedValue = commandOfOutput.String()
 			fmt.Println("StderrOf: " + m)
 		}
