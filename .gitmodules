@@ -1,0 +1,3 @@
+[submodule "RemoteForensicApplianceFrontend"]
+	path = RemoteForensicApplianceFrontend
+	url = https://github.com/LukasMarckmiller/RemoteForensicApplianceFrontend.git
