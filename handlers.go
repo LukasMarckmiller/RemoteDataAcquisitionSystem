@@ -9,6 +9,7 @@ import (
 )
 
 var jobs = map[string]*ImageJob{}
+var imageJobError error
 
 func showIndexPage(context *gin.Context) {
 	context.HTML(
@@ -58,7 +59,8 @@ func createAndStartImageJob(context *gin.Context) {
 	context.BindJSON(&imageJobRequestPresentation)
 	devPath := imageJobRequestPresentation.Path
 
-	go job.runDc3dd(devPath)
+	go func() { imageJobError = job.runDc3dd(devPath) }()
+
 	jobs[job.Id] = &job
 
 	context.JSON(http.StatusOK, job.Id)
@@ -70,8 +72,13 @@ func getImageJobById(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"status": http.StatusBadRequest, "message": "Bad input value for parameter id, no image job for id."})
 		return
 	}
+	err := false
+	if imageJobError != nil {
+		err = true
+	}
 
-	context.JSON(http.StatusOK, ImageJobPresentationType{CommandOfOutput: elem.COfCachedValue, CommandIfOutput: elem.CIfcachedValue, Running: elem.Running, Id: elem.Id})
+	inputFileOut, outputFileOut := elem.getCachedOutput()
+	context.JSON(http.StatusOK, ImageJobPresentationType{CommandOfOutput: outputFileOut, CommandIfOutput: inputFileOut, Running: elem.Running, Id: elem.Id, Error: err})
 }
 
 func getStatInfo(context *gin.Context) {
@@ -85,6 +92,7 @@ type ImageJobPresentationType struct {
 	CommandIfOutput string `json:"commandIfOutput"`
 	Running         bool   `json:"running"`
 	Id              string `json:"id"`
+	Error           bool
 }
 
 type ImageJobRequestPresentationType struct {
