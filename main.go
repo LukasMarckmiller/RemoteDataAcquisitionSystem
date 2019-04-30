@@ -4,14 +4,14 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/semihalev/gin-stats"
-	"io/ioutil"
 )
 
 var router *gin.Engine
 
 func main() {
-	gin.SetMode(gin.ReleaseMode)
-	gin.DefaultWriter = ioutil.Discard
+	gin.SetMode(gin.DebugMode)
+	//Uncomment the next line if you need gin debug output like handled requests by gin
+	//gin.DefaultWriter = ioutil.Discard
 	//Set the router as default
 	router = gin.Default()
 	//Load static html content
