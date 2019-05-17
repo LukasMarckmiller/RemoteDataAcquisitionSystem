@@ -13,3 +13,4 @@
 out/
 *.iml
 web/
+.idea
