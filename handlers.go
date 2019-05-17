@@ -5,11 +5,13 @@ import (
 	"github.com/semihalev/gin-stats"
 	"github.com/twinj/uuid"
 	"net/http"
+	"net/url"
 	"strconv"
 )
 
 var jobs = map[string]*ImageJob{}
 var imageJobError error
+var cachedOptions ImageOption
 
 func showIndexPage(context *gin.Context) {
 	context.HTML(
@@ -21,7 +23,26 @@ func showIndexPage(context *gin.Context) {
 		})
 }
 
-func getMountedMedia(context *gin.Context) {
+func getIsRemoteTransferPossible(context *gin.Context) {
+	var device DevicePresentationType
+	if err := context.BindJSON(&device); err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"status": http.StatusBadRequest, "message": "Bad request format."})
+	}
+	time, err := getEstimatedTimeInSecs(device.Size)
+	if err != nil {
+		cachedOptions.Target = Remote
+		fullImageTransfer := validateTime(time)
+		if fullImageTransfer {
+			cachedOptions.Type = Full
+		} else {
+			cachedOptions.Type = Part
+		}
+	} else {
+		cachedOptions.Target = Local
+	}
+}
+
+func getMedia(context *gin.Context) {
 
 	err, disks := getDisksWithoutBootPart()
 	if err != nil {
@@ -29,6 +50,22 @@ func getMountedMedia(context *gin.Context) {
 		return
 	}
 	context.JSON(http.StatusOK, disks)
+}
+
+func getDiskSpaceStatus(context *gin.Context) {
+	path := context.Params.ByName("path")
+	path, _ = url.QueryUnescape(path)
+	path, _ = strconv.Unquote(path)
+	context.JSON(http.StatusOK, getAvailableDiskSpace(path))
+}
+
+func getMountedMedia(context *gin.Context) {
+	err, parts := getMountPointsWithoutBoot()
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"status": http.StatusInternalServerError, "message": "Error retrieving device information."})
+		return
+	}
+	context.JSON(http.StatusOK, parts)
 }
 
 func getMountedMediaById(context *gin.Context) {
@@ -53,13 +90,14 @@ func getMountedMediaById(context *gin.Context) {
 }
 
 func createAndStartImageJob(context *gin.Context) {
+	//Check disk write estimated time and set to ImageJobOptions -> part if low writetime and full if good write time
 	var imageJobRequestPresentation ImageJobRequestPresentationType
 
-	job := ImageJob{Id: uuid.NewV4().String()}
+	job := ImageJob{Id: uuid.NewV4().String(), Option: cachedOptions}
 	context.BindJSON(&imageJobRequestPresentation)
 	devPath := imageJobRequestPresentation.Path
 
-	go func() { imageJobError = job.runDc3dd(devPath) }()
+	go func() { imageJobError = job.run(devPath, "sdbtest.img") }()
 
 	jobs[job.Id] = &job
 
@@ -97,4 +135,9 @@ type ImageJobPresentationType struct {
 
 type ImageJobRequestPresentationType struct {
 	Path string `json:"path"`
+}
+
+type DevicePresentationType struct {
+	Name string `json:"name"`
+	Size int    `json:"size"`
 }

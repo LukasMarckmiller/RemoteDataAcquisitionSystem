@@ -11,17 +11,31 @@ import (
 type ImageJob struct {
 	Running bool
 	Id      string
+	Option  ImageOption
 }
 
+type ImageOption struct {
+	Type   ImageType
+	Target ImageTarget
+}
+
+type ImageType int
+type ImageTarget int
+
 const (
-	DefaultShell         = "sh"
-	AquisitionTool       = "dc3dd"
-	InputFileArg         = "if="
-	InputFileSubDir      = "/dev/"
-	InputArgs            = "verb=on" // log=/home/lukas/rfa/log" //tilde (~) doesnt get resolved for log param
-	OutputFileArgs       = "of=~/rfa/"
-	OutputArgs           = "verb=on"                   //log=/home/lab02/rfa/log Caution with log on output!! after finishing the copy process it seems all output is written to the log file which can take a long time
-	OutputWrapperCommand = "ssh lukas@192.168.0.11 -C" //-v for verbose
+	DefaultShell    = "sh"
+	AquisitionTool  = "dc3dd"
+	InputFileArg    = "if="
+	InputFileSubDir = "/dev/"
+	InputArgs       = "verb=on" // log=/home/lukas/rfa/log" //tilde (~) doesnt get resolved for log param
+	OutputFileArgs  = "of=~/rfa/"
+	OutputArgs      = "verb=on" //log=/home/lab02/rfa/log Caution with log on output!! after finishing the copy process it seems all output is written to the log file which can take a long time
+
+	Full ImageType = 0
+	Part ImageType = 1
+
+	Remote ImageTarget = 0
+	Local  ImageTarget = 1
 )
 
 var commandIfOutput strings.Builder
@@ -36,7 +50,7 @@ func (i *ImageJob) getCachedOutput() (iCache string, oCache string) {
 }
 
 //TODO - Implement Progress by using ofs and check if each junk gets reported to stderr, when this is the case compute max chunk len before and then you know how many chunks left
-func (i *ImageJob) runDc3dd(dev string) error {
+func (i *ImageJob) run(dev string, imgName string) error {
 	defer func() { i.Running = false }()
 
 	i.Running = true
@@ -51,7 +65,7 @@ func (i *ImageJob) runDc3dd(dev string) error {
 	defer w.Close()
 
 	commandIf := fmt.Sprintf("%v %v%v%v %v", AquisitionTool, InputFileArg, InputFileSubDir, dev, InputArgs)
-	commandOf := fmt.Sprintf("%v \"%v %v %vsdbtest.img\"", OutputWrapperCommand, AquisitionTool, OutputArgs, OutputFileArgs)
+	commandOf := fmt.Sprintf("ssh %v -C '%v %v %v%v'", app.Server, AquisitionTool, OutputArgs, OutputFileArgs, imgName)
 
 	cmdIf := exec.Command(DefaultShell, "-c", commandIf)
 	cmdIf.Stdout = w

@@ -3,10 +3,27 @@ package main
 import (
 	"fmt"
 	"github.com/jaypipes/ghw"
+	"golang.org/x/sys/unix"
 	"strings"
 )
 
-type ghwb struct {
+type DiskSpace struct {
+	All  uint64 `json:"all"`
+	Used uint64 `json:"used"`
+	Free uint64 `json:"free"`
+}
+
+func getAvailableDiskSpace(path string) (disk DiskSpace) {
+	fs := unix.Statfs_t{}
+	if err := unix.Statfs(path, &fs); err != nil {
+		return
+	}
+
+	//Convert to bytes
+	disk.All = fs.Blocks * uint64(fs.Bsize)
+	disk.Free = fs.Bavail * uint64(fs.Bsize)
+	disk.Used = disk.All - disk.Free
+	return
 }
 
 func printBlockStorageInfo() {
@@ -24,31 +41,48 @@ func printBlockStorageInfo() {
 	}
 }
 
-func getDisksWithoutBootPart() (error, []*ghw.Disk) {
+func getDisksWithoutBootPart() (err error, disks []ghw.Disk) {
 	block, err := ghw.Block()
 	if err != nil {
 		//fmt.Printf("Error getting block storage info: %v", err)
-		return err, nil
+		return
 	}
 
-	var disksResult []*ghw.Disk
 	isBootPartition := false
 
 	for _, disk := range block.Disks {
 		for _, part := range disk.Partitions {
-			if strings.HasPrefix(part.MountPoint, "/boot/") {
+			if strings.HasPrefix(part.MountPoint, "/boot") {
 				isBootPartition = true
 				break
 			}
 		}
 
 		if !isBootPartition {
-			disksResult = append(disksResult, disk)
+			disks = append(disks, *disk)
 		}
 
 		isBootPartition = false
 	}
 
-	return err, disksResult
+	return
+}
 
+func getMountPointsWithoutBoot() (err error, parts []ghw.Partition) {
+
+	block, err := ghw.Block()
+	if err != nil {
+		//fmt.Printf("Error getting block storage info: %v", err)
+		return
+	}
+
+	for _, disk := range block.Disks {
+		for _, part := range disk.Partitions {
+			if part.MountPoint != "" && !strings.HasPrefix(part.MountPoint, "/boot") {
+				parts = append(parts, *part)
+			}
+		}
+	}
+
+	return
 }
