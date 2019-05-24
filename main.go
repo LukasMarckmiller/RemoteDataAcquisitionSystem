@@ -14,7 +14,7 @@ type config struct {
 }
 
 func main() {
-	app = &config{"lab02@192.168.0.9"}
+	app = &config{"lukas@192.168.0.11"}
 	gin.SetMode(gin.DebugMode)
 	//Uncomment the next line if you need gin debug output like handled requests by gin
 	//gin.DefaultWriter = ioutil.Discard

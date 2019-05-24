@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/semihalev/gin-stats"
 	"github.com/twinj/uuid"
@@ -27,19 +28,28 @@ func getIsRemoteTransferPossible(context *gin.Context) {
 	var device DevicePresentationType
 	if err := context.BindJSON(&device); err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"status": http.StatusBadRequest, "message": "Bad request format."})
+		return
 	}
-	time, err := getEstimatedTimeInSecs(device.Size)
+	estimatedTime, err := getEstimatedTimeInSecs(device.Size, device.Name)
 	if err != nil {
+		cachedOptions.Target = Local
+	} else {
+
 		cachedOptions.Target = Remote
-		fullImageTransfer := validateTime(time)
+		fullImageTransfer := validateTime(estimatedTime)
+
+		h := estimatedTime / 60 / 60
+		estimatedTime -= h * 60 * 60
+		m := estimatedTime / 60
+
+		fmt.Printf("Estimated time %02d:%02d\n", h, m)
 		if fullImageTransfer {
 			cachedOptions.Type = Full
 		} else {
 			cachedOptions.Type = Part
 		}
-	} else {
-		cachedOptions.Target = Local
 	}
+	context.JSON(http.StatusOK, &ImageOptionsPresentationType{cachedOptions, estimatedTime})
 }
 
 func getMedia(context *gin.Context) {
@@ -98,9 +108,7 @@ func createAndStartImageJob(context *gin.Context) {
 	devPath := imageJobRequestPresentation.Path
 
 	go func() { imageJobError = job.run(devPath, "sdbtest.img") }()
-
 	jobs[job.Id] = &job
-
 	context.JSON(http.StatusOK, job.Id)
 }
 
@@ -139,5 +147,10 @@ type ImageJobRequestPresentationType struct {
 
 type DevicePresentationType struct {
 	Name string `json:"name"`
-	Size int    `json:"size"`
+	Size int64  `json:"size"`
+}
+
+type ImageOptionsPresentationType struct {
+	ImageOption   ImageOption `json:"image_option"`
+	EstimatedSecs int32       `json:"estimated_secs"`
 }

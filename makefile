@@ -1,6 +1,6 @@
 init:
-	git submodule update --init --recursive
+	git submodule update --recursive --remote
 	cd RemoteForensicApplianceFrontend && yarn run build && cp -r dist/* ../web/ && cd ..
-	go build -i -o go_build_RemoteForensicAppliance . #gosetup
+	GOARCH=arm go build -i -o go_build_RemoteForensicAppliance . #gosetup
 run:
 	./go_build_RemoteForensicAppliance #gosetup

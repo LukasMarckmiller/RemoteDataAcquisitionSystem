@@ -7,44 +7,61 @@ import (
 )
 
 const (
-	C        = 1
-	K        = C * 1024
-	M        = K * 1024
-	G        = M * 1024
-	minBound = 12 //12 Hours
+	C            = 1
+	K            = C * 1024
+	M            = K * 1024
+	G            = M * 1024
+	MinBoundMin  = 8 * 60 //12 Hours in mins
+	TestByteSize = 1 * K
+	TestCount    = 10 * K //Transmission total = TestByteSize * TestCount
 )
 
-func validateTime(timeInSecs uint32) bool {
-	timeInH := timeInSecs / 60 / 60
-	if timeInH <= minBound {
+func validateTime(timeInSecs int32) bool {
+	timeInM := timeInSecs / 60
+	if timeInM <= MinBoundMin {
 		return true
 	} else {
 		return false
 	}
 }
 
-func getEstimatedTimeInSecs(filesize int) (uint32, error) {
-	throughput, err := getThroughputInMBPerSec()
+func getEstimatedTimeInSecs(filesize int64, deviceName string) (int32, error) {
+	throughput, err := getThroughputInMBPerSec(deviceName)
 	if err != nil {
 		return 0, err
 	}
 
-	return uint32(float64(filesize) / throughput), nil
+	return int32(float64(filesize) / throughput), nil
 }
 
 /*Speedtest*/
 
-func getThroughputInMBPerSec() (throughput float64, err error) {
+func getThroughputInMBPerSec(deviceName string) (throughput float64, err error) {
 	//10 MB
-	cmdctn := fmt.Sprintf("dd if=/dev/zero bs=%d count=10000 | ssh %v 'cat > /dev/null'", 1*K, app.Server)
+	cmdctn := fmt.Sprintf("dd if=/dev/%s bs=%d count=%d | ssh -C  %v 'cat > /dev/null'", deviceName, TestByteSize, TestCount, app.Server)
 	cmd := exec.Command("sh", "-c", cmdctn)
 	before := time.Now()
+
+	timeout := time.AfterFunc(10*time.Second, func() {
+		if err := cmd.Process.Kill(); err != nil {
+			fmt.Println("Cant kill network check process.")
+			return
+		}
+		fmt.Println("Network check process killed.")
+	})
+
 	if err := cmd.Run(); err != nil {
-		return -1, err
+		return 0, err
 	}
+	//Stop timeout if finished
+	fmt.Println("Timer stopped.")
+	timeout.Stop()
+	//Just to be sure
+	timeout = nil
+
 	after := time.Now()
 	duration := after.Sub(before).Seconds()
 
-	return 10 * M / duration, nil //in byte/s
+	return (TestByteSize * TestCount) / duration, nil //in byte/s
 
 }

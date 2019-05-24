@@ -15,8 +15,8 @@ type ImageJob struct {
 }
 
 type ImageOption struct {
-	Type   ImageType
-	Target ImageTarget
+	Type   ImageType   `json:"type"`
+	Target ImageTarget `json:"target"`
 }
 
 type ImageType int
@@ -64,8 +64,8 @@ func (i *ImageJob) run(dev string, imgName string) error {
 	r, w := io.Pipe()
 	defer w.Close()
 
-	commandIf := fmt.Sprintf("%v %v%v%v %v", AquisitionTool, InputFileArg, InputFileSubDir, dev, InputArgs)
-	commandOf := fmt.Sprintf("ssh %v -C '%v %v %v%v'", app.Server, AquisitionTool, OutputArgs, OutputFileArgs, imgName)
+	commandIf := fmt.Sprintf("%v hash=sha256 hash=md5 hlog=hash.log %v%v%v %v", AquisitionTool, InputFileArg, InputFileSubDir, dev, InputArgs) //| gzip -c -1
+	commandOf := fmt.Sprintf("ssh %v -C '%v %v %v%v.img'", app.Server, AquisitionTool, OutputArgs, OutputFileArgs, imgName)
 
 	cmdIf := exec.Command(DefaultShell, "-c", commandIf)
 	cmdIf.Stdout = w
