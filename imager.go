@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -26,12 +27,16 @@ type ImageType int
 type ImageTarget int
 
 const (
-	DefaultShell    = "sh"
+	DefaultExtension = ".img"
+	Root             = "~/rfa/"
+	DefaultShell     = "sh"
+
+	//DC3DD
 	AquisitionTool  = "dc3dd"
 	InputFileArg    = "if="
 	InputFileSubDir = "/dev/"
 	InputArgs       = "verb=on" // log=/home/lukas/rfa/log" //tilde (~) doesnt get resolved for log param
-	OutputFileArgs  = "hof=~/rfa/"
+	OutputFileArgs  = "hof=" + Root
 	OutputArgs      = "verb=on" //log=/home/lab02/rfa/log Caution with log on output!! after finishing the copy process it seems all output is written to the log file which can take a long time
 
 	Full ImageType = 0
@@ -41,15 +46,28 @@ const (
 	Local  ImageTarget = 1
 )
 
-var commandIfOutput strings.Builder
-var commandOfOutput strings.Builder
+var (
+	md5Regex        = regexp.MustCompile(`[a-f0-9]{32} \(md5\)`)
+	sha256Regex     = regexp.MustCompile(`[A-Fa-f0-9]{64} \(sha256\)`)
+	commandIfOutput strings.Builder
+	commandOfOutput strings.Builder
+	hashResult      = HashResult{}
+)
 
-func (i *ImageJob) getCachedOutput() (iCache string, oCache string) {
+type HashResult struct {
+	Md5Input  string `json:"md_5_input"`
+	Md5Output string `json:"md_5_output"`
+
+	Sha256Input  string `json:"sha_256_input"`
+	Sha256Output string `json:"sha_256_output"`
+}
+
+func (i *ImageJob) getCachedOutput() (string, string, HashResult) {
 	sI := commandIfOutput.String()
 	sO := commandOfOutput.String()
 	commandIfOutput.Reset()
 	commandOfOutput.Reset()
-	return sI, sO
+	return sI, sO, hashResult
 }
 
 //TODO - Implement Progress by using ofs and check if each junk gets reported to stderr, when this is the case compute max chunk len before and then you know how many chunks left
@@ -67,13 +85,26 @@ func (i *ImageJob) run(dev string, imgName string) error {
 	r, w := io.Pipe()
 	defer w.Close()
 
-	commandIf := fmt.Sprintf("%v hash=sha256 hash=md5 hlog=%v.hash %v%v%v %v", AquisitionTool, imgName, InputFileArg, InputFileSubDir, dev, InputArgs) //| gzip -c -1
+	extension := DefaultExtension
+
+	var commandIf string
 	var commandOf string
 
-	if i.Option.Target == Local {
-		commandOf = fmt.Sprintf("%v %v %v%v.img'", AquisitionTool, OutputArgs, OutputFileArgs, imgName)
+	//Set defaults
+	commandIf = fmt.Sprintf("%s hash=sha256 hash=md5 hlog=%s.hash %s %s%s%s", AquisitionTool, imgName, InputArgs, InputFileArg, InputFileSubDir, dev)
+
+	//Automatically compress/decompress transmission. Compression cant get deactivated for remote transfer
+	if i.Option.Target == Remote {
+		commandIf += " | gzip -6"
+		commandOf = fmt.Sprintf("ssh %s -C 'funzip | %s hash=sha256 hash=md5 hlog=%s.hash %s %s%s%s'", app.Server, AquisitionTool, imgName, OutputArgs, OutputFileArgs, imgName, extension)
 	} else {
-		commandOf = fmt.Sprintf("ssh %v -C '%v hash=sha256 hash=md5 hlog=%v.hash %v %v%v.img'", app.Server, AquisitionTool, imgName, OutputArgs, OutputFileArgs, imgName)
+		//Compress local image if option is set
+		if i.Option.Compressed {
+			commandIf += " | gzip -6"
+			extension += ".gz"
+		}
+
+		commandOf = fmt.Sprintf("%s hash=sha256 hash=md5 hlog=%s.hash  %s %s%s%s'", AquisitionTool, imgName, OutputArgs, OutputFileArgs, imgName, extension)
 	}
 
 	i.CmdIf = exec.Command(DefaultShell, "-c", commandIf)
@@ -170,8 +201,15 @@ func (i *ImageJob) run(dev string, imgName string) error {
 	} else {
 		fmt.Println("Output Command ended successfully")
 	}
-	//At this point either command1 is finished and command2 is finished without errors
-	//or command1 is not finished and command2 is finished with errors
+
+	var hashes = HashResult{}
+
+	hashes.md5Input = md5Regex.FindString(commandIfOutput.String())
+	hashes.md5Output = md5Regex.FindString(commandOfOutput.String())
+
+	hashes.sha256Input = sha256Regex.FindString(commandIfOutput.String())
+	hashes.sha256Output = sha256Regex.FindString(commandOfOutput.String())
+
 	fmt.Println("Done")
 	return nil
 }

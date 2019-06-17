@@ -38,7 +38,7 @@ func getEstimatedTimeInSecs(filesize int64, deviceName string) (int32, error) {
 
 func getThroughputInBPerSec(deviceName string) (throughput float64, err error) {
 	//10 MB
-	cmdctn := fmt.Sprintf("dd if=/dev/%s bs=%d count=%d | ssh -C  %v 'cat > /dev/null'", deviceName, TestByteSize, TestCount, app.Server)
+	cmdctn := fmt.Sprintf("dd if=/dev/%s bs=%d count=%d | gzip | ssh -C  %v 'cat > /dev/null'", deviceName, TestByteSize, TestCount, app.Server)
 	cmd := exec.Command("sh", "-c", cmdctn)
 
 	timeout := time.AfterFunc(10*time.Second, func() {

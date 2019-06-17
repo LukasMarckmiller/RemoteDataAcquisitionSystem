@@ -26,6 +26,7 @@ func showIndexPage(context *gin.Context) {
 func getIsRemoteTransferPossible(context *gin.Context) {
 	var device DevicePresentationType
 	var cachedOptions ImageOption
+	cachedOptions.Compressed = true
 
 	if err := context.BindJSON(&device); err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"status": http.StatusBadRequest, "message": "Bad request format."})
@@ -116,7 +117,7 @@ func createAndStartImageJob(context *gin.Context) {
 	uuidV4 := uuid.NewV4().String()
 	job := ImageJob{Id: uuidV4, Option: cachedOptions}
 
-	go func() { imageJobError = job.run(devPath, "sdbtest.img") }()
+	go func() { imageJobError = job.run(devPath, uuidV4) }()
 	jobs[job.Id] = &job
 	context.JSON(http.StatusOK, job.Id)
 }
@@ -144,13 +145,13 @@ func getImageJobById(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"status": http.StatusBadRequest, "message": "Bad input value for parameter id, no image job for id."})
 		return
 	}
-	err := false
+	var imageJobErrorText string
 	if imageJobError != nil {
-		err = true
+		imageJobErrorText = imageJobError.Error()
 	}
 
-	inputFileOut, outputFileOut := elem.getCachedOutput()
-	context.JSON(http.StatusOK, ImageJobPresentationType{CommandOfOutput: outputFileOut, CommandIfOutput: inputFileOut, Running: elem.Running, Id: elem.Id, Error: err})
+	inputFileOut, outputFileOut, hashes := elem.getCachedOutput()
+	context.JSON(http.StatusOK, ImageJobPresentationType{CommandOfOutput: outputFileOut, CommandIfOutput: inputFileOut, Running: elem.Running, Id: elem.Id, Error: imageJobErrorText, Hashes: hashes})
 }
 
 func getStatInfo(context *gin.Context) {
@@ -160,11 +161,12 @@ func getStatInfo(context *gin.Context) {
 //TODO Implement cache cleaning for ImageJobs
 
 type ImageJobPresentationType struct {
-	CommandOfOutput string `json:"commandOfOutput"`
-	CommandIfOutput string `json:"commandIfOutput"`
-	Running         bool   `json:"running"`
-	Id              string `json:"id"`
-	Error           bool
+	CommandOfOutput string     `json:"commandOfOutput"`
+	CommandIfOutput string     `json:"commandIfOutput"`
+	Running         bool       `json:"running"`
+	Id              string     `json:"id"`
+	Error           string     `json:"error"`
+	Hashes          HashResult `json:"hashes"`
 }
 
 type ImageJobRequestPresentationType struct {
