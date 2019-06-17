@@ -4,17 +4,24 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/semihalev/gin-stats"
+	"os"
 )
 
-var router *gin.Engine
-var app *config
+var (
+	router *gin.Engine
+	app    *config
+)
+
+const (
+	portDefault = "8000"
+)
 
 type config struct {
 	Server string
 }
 
 func main() {
-	app = &config{"lukas@192.168.0.11"}
+	app = &config{"lab02@192.168.0.9"}
 	gin.SetMode(gin.DebugMode)
 	//Uncomment the next line if you need gin debug output like handled requests by gin
 	//gin.DefaultWriter = ioutil.Discard
@@ -44,7 +51,11 @@ func main() {
 		fmt.Printf(disk.String())l
 	}
 	*/
-	router.Run(":8000")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = portDefault
+	}
+	router.Run(":" + port)
 	//router.RunTLS(":5443", "/etc/ssl/certs/server.crt","/etc/ssl/private/server.key")
 }
 

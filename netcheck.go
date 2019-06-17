@@ -26,7 +26,7 @@ func validateTime(timeInSecs int32) bool {
 }
 
 func getEstimatedTimeInSecs(filesize int64, deviceName string) (int32, error) {
-	throughput, err := getThroughputInMBPerSec(deviceName)
+	throughput, err := getThroughputInBPerSec(deviceName)
 	if err != nil {
 		return 0, err
 	}
@@ -36,26 +36,26 @@ func getEstimatedTimeInSecs(filesize int64, deviceName string) (int32, error) {
 
 /*Speedtest*/
 
-func getThroughputInMBPerSec(deviceName string) (throughput float64, err error) {
+func getThroughputInBPerSec(deviceName string) (throughput float64, err error) {
 	//10 MB
 	cmdctn := fmt.Sprintf("dd if=/dev/%s bs=%d count=%d | ssh -C  %v 'cat > /dev/null'", deviceName, TestByteSize, TestCount, app.Server)
 	cmd := exec.Command("sh", "-c", cmdctn)
-	before := time.Now()
 
 	timeout := time.AfterFunc(10*time.Second, func() {
 		if err := cmd.Process.Kill(); err != nil {
-			fmt.Println("Cant kill network check process.")
+			fmt.Printf("Cant kill network check process.\n%s\n", err)
 			return
 		}
 		fmt.Println("Network check process killed.")
 	})
 
+	before := time.Now()
 	if err := cmd.Run(); err != nil {
 		return 0, err
 	}
+	timeout.Stop()
 	//Stop timeout if finished
 	fmt.Println("Timer stopped.")
-	timeout.Stop()
 	//Just to be sure
 	timeout = nil
 

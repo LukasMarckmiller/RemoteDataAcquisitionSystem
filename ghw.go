@@ -70,6 +70,7 @@ func getDisksWithoutBootPart() (err error, disks []ghw.Disk) {
 
 func getMountPointsWithoutBoot() (err error, parts []ghw.Partition) {
 
+	//TODO HandleReadOnly Mounts. But dont just hide them because the user needs to know its read-only
 	block, err := ghw.Block()
 	if err != nil {
 		//fmt.Printf("Error getting block storage info: %v", err)

@@ -12,11 +12,14 @@ type ImageJob struct {
 	Running bool
 	Id      string
 	Option  ImageOption
+	CmdIf   *exec.Cmd
+	CmdOf   *exec.Cmd
 }
 
 type ImageOption struct {
-	Type   ImageType   `json:"type"`
-	Target ImageTarget `json:"target"`
+	Type       ImageType   `json:"type"`
+	Target     ImageTarget `json:"target"`
+	Compressed bool        `json:"compressed"`
 }
 
 type ImageType int
@@ -28,7 +31,7 @@ const (
 	InputFileArg    = "if="
 	InputFileSubDir = "/dev/"
 	InputArgs       = "verb=on" // log=/home/lukas/rfa/log" //tilde (~) doesnt get resolved for log param
-	OutputFileArgs  = "of=~/rfa/"
+	OutputFileArgs  = "hof=~/rfa/"
 	OutputArgs      = "verb=on" //log=/home/lab02/rfa/log Caution with log on output!! after finishing the copy process it seems all output is written to the log file which can take a long time
 
 	Full ImageType = 0
@@ -64,33 +67,39 @@ func (i *ImageJob) run(dev string, imgName string) error {
 	r, w := io.Pipe()
 	defer w.Close()
 
-	commandIf := fmt.Sprintf("%v hash=sha256 hash=md5 hlog=hash.log %v%v%v %v", AquisitionTool, InputFileArg, InputFileSubDir, dev, InputArgs) //| gzip -c -1
-	commandOf := fmt.Sprintf("ssh %v -C '%v %v %v%v.img'", app.Server, AquisitionTool, OutputArgs, OutputFileArgs, imgName)
+	commandIf := fmt.Sprintf("%v hash=sha256 hash=md5 hlog=%v.hash %v%v%v %v", AquisitionTool, imgName, InputFileArg, InputFileSubDir, dev, InputArgs) //| gzip -c -1
+	var commandOf string
 
-	cmdIf := exec.Command(DefaultShell, "-c", commandIf)
-	cmdIf.Stdout = w
+	if i.Option.Target == Local {
+		commandOf = fmt.Sprintf("%v %v %v%v.img'", AquisitionTool, OutputArgs, OutputFileArgs, imgName)
+	} else {
+		commandOf = fmt.Sprintf("ssh %v -C '%v hash=sha256 hash=md5 hlog=%v.hash %v %v%v.img'", app.Server, AquisitionTool, imgName, OutputArgs, OutputFileArgs, imgName)
+	}
 
-	cmdOf := exec.Command(DefaultShell, "-c", commandOf)
-	cmdOf.Stdin = r
+	i.CmdIf = exec.Command(DefaultShell, "-c", commandIf)
+	i.CmdIf.Stdout = w
 
-	readerStderrIf, err := cmdIf.StderrPipe()
+	i.CmdOf = exec.Command(DefaultShell, "-c", commandOf)
+	i.CmdOf.Stdin = r
+
+	readerStderrIf, err := i.CmdIf.StderrPipe()
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	readerStderrOf, err := cmdOf.StderrPipe()
+	readerStderrOf, err := i.CmdOf.StderrPipe()
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	if err = cmdIf.Start(); err != nil {
+	if err = i.CmdIf.Start(); err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	if err = cmdOf.Start(); err != nil {
+	if err = i.CmdOf.Start(); err != nil {
 		fmt.Println(err)
 		return err
 	}
@@ -121,7 +130,6 @@ func (i *ImageJob) run(dev string, imgName string) error {
 
 	go func() {
 		defer fmt.Println("StderrOf done")
-
 		reader := bufio.NewReader(readerStderrOf)
 
 		for {
@@ -144,7 +152,7 @@ func (i *ImageJob) run(dev string, imgName string) error {
 	}()
 
 	fmt.Println("Waiting for Input Command")
-	if err := cmdIf.Wait(); err != nil {
+	if err := i.CmdIf.Wait(); err != nil {
 		fmt.Println(err)
 		return err
 	} else {
@@ -156,7 +164,7 @@ func (i *ImageJob) run(dev string, imgName string) error {
 		return err
 	}
 
-	if err := cmdOf.Wait(); err != nil {
+	if err := i.CmdOf.Wait(); err != nil {
 		fmt.Println(err)
 		return err
 	} else {
@@ -165,5 +173,18 @@ func (i *ImageJob) run(dev string, imgName string) error {
 	//At this point either command1 is finished and command2 is finished without errors
 	//or command1 is not finished and command2 is finished with errors
 	fmt.Println("Done")
+	return nil
+}
+
+func (i *ImageJob) cancel() error {
+	if err := i.CmdIf.Process.Kill(); err != nil {
+		return err
+
+	}
+
+	if err := i.CmdOf.Process.Kill(); err != nil {
+		return err
+	}
+
 	return nil
 }

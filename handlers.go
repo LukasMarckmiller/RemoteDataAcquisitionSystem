@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/jaypipes/ghw"
 	"github.com/semihalev/gin-stats"
 	"github.com/twinj/uuid"
 	"net/http"
@@ -12,7 +12,6 @@ import (
 
 var jobs = map[string]*ImageJob{}
 var imageJobError error
-var cachedOptions ImageOption
 
 func showIndexPage(context *gin.Context) {
 	context.HTML(
@@ -26,6 +25,8 @@ func showIndexPage(context *gin.Context) {
 
 func getIsRemoteTransferPossible(context *gin.Context) {
 	var device DevicePresentationType
+	var cachedOptions ImageOption
+
 	if err := context.BindJSON(&device); err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"status": http.StatusBadRequest, "message": "Bad request format."})
 		return
@@ -37,12 +38,14 @@ func getIsRemoteTransferPossible(context *gin.Context) {
 
 		cachedOptions.Target = Remote
 		fullImageTransfer := validateTime(estimatedTime)
+		/*
+			time := estimatedTime
+			h := time / 60 / 60
+			time -= h * 60 * 60
+			m := time / 60
 
-		h := estimatedTime / 60 / 60
-		estimatedTime -= h * 60 * 60
-		m := estimatedTime / 60
-
-		fmt.Printf("Estimated time %02d:%02d\n", h, m)
+			fmt.Printf("Estimated time %02d:%02d\n", h, m)
+		*/
 		if fullImageTransfer {
 			cachedOptions.Type = Full
 		} else {
@@ -103,17 +106,40 @@ func createAndStartImageJob(context *gin.Context) {
 	//Check disk write estimated time and set to ImageJobOptions -> part if low writetime and full if good write time
 	var imageJobRequestPresentation ImageJobRequestPresentationType
 
-	job := ImageJob{Id: uuid.NewV4().String(), Option: cachedOptions}
-	context.BindJSON(&imageJobRequestPresentation)
+	if err := context.BindJSON(&imageJobRequestPresentation); err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"status": http.StatusBadRequest, "message": "Bad input value for imageJob."})
+		return
+	}
+
 	devPath := imageJobRequestPresentation.Path
+	cachedOptions := imageJobRequestPresentation.ImageOption
+	uuidV4 := uuid.NewV4().String()
+	job := ImageJob{Id: uuidV4, Option: cachedOptions}
 
 	go func() { imageJobError = job.run(devPath, "sdbtest.img") }()
 	jobs[job.Id] = &job
 	context.JSON(http.StatusOK, job.Id)
 }
 
+func cancelImageJob(context *gin.Context) {
+	elem, ok := jobs[context.Param("id")]
+	if !ok {
+		context.JSON(http.StatusBadRequest, gin.H{"status": http.StatusBadRequest, "message": "Bad input value for parameter id, no image job for id."})
+		return
+	}
+
+	if err := elem.cancel(); err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"status": http.StatusInternalServerError, "message": "Error while canceling image job."})
+		return
+	}
+
+	delete(jobs, context.Param("id"))
+	context.Status(http.StatusOK)
+	return
+}
+
 func getImageJobById(context *gin.Context) {
-	elem, ok := jobs[context.Params.ByName("id")]
+	elem, ok := jobs[context.Param("id")]
 	if !ok {
 		context.JSON(http.StatusBadRequest, gin.H{"status": http.StatusBadRequest, "message": "Bad input value for parameter id, no image job for id."})
 		return
@@ -142,7 +168,9 @@ type ImageJobPresentationType struct {
 }
 
 type ImageJobRequestPresentationType struct {
-	Path string `json:"path"`
+	Path        string        `json:"path"`
+	ImageOption ImageOption   `json:"image_option"`
+	Mount       ghw.Partition `json:"mount"`
 }
 
 type DevicePresentationType struct {
