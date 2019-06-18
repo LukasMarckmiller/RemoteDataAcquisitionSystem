@@ -10,11 +10,13 @@ import (
 )
 
 type ImageJob struct {
-	Running bool
-	Id      string
-	Option  ImageOption
-	CmdIf   *exec.Cmd
-	CmdOf   *exec.Cmd
+	Running    bool        `json:"running"`
+	Id         string      `json:"id"`
+	Option     ImageOption `json:"option"`
+	CmdIf      *exec.Cmd   `json:"cmd_if"`
+	CmdOf      *exec.Cmd   `json:"cmd_of"`
+	HashResult HashResult  `json:"hash_result"`
+	Hashes     Hashes      `json:"hashes"`
 }
 
 type ImageOption struct {
@@ -47,14 +49,19 @@ const (
 )
 
 var (
-	md5Regex        = regexp.MustCompile(`[a-f0-9]{32} \(md5\)`)
-	sha256Regex     = regexp.MustCompile(`[A-Fa-f0-9]{64} \(sha256\)`)
+	md5Regex    = regexp.MustCompile(`[a-f0-9]{32} \(md5\)`)
+	sha256Regex = regexp.MustCompile(`[A-Fa-f0-9]{64} \(sha256\)`)
+
 	commandIfOutput strings.Builder
 	commandOfOutput strings.Builder
-	hashResult      = HashResult{}
+
+	bufferedOutput string
+	bufferedInput  string
+	pipeWriter     *io.PipeWriter
+	pipeReader     *io.PipeReader
 )
 
-type HashResult struct {
+type Hashes struct {
 	Md5Input  string `json:"md_5_input"`
 	Md5Output string `json:"md_5_output"`
 
@@ -62,12 +69,17 @@ type HashResult struct {
 	Sha256Output string `json:"sha_256_output"`
 }
 
-func (i *ImageJob) getCachedOutput() (string, string, HashResult) {
+type HashResult struct {
+	Md5Valid    bool `json:"md_5_valid"`
+	Sha256Valid bool `json:"sha_256_valid"`
+}
+
+func (i *ImageJob) getCachedOutput() (string, string) {
 	sI := commandIfOutput.String()
 	sO := commandOfOutput.String()
 	commandIfOutput.Reset()
 	commandOfOutput.Reset()
-	return sI, sO, hashResult
+	return sI, sO
 }
 
 //TODO - Implement Progress by using ofs and check if each junk gets reported to stderr, when this is the case compute max chunk len before and then you know how many chunks left
@@ -82,8 +94,8 @@ func (i *ImageJob) run(dev string, imgName string) error {
 		return err
 	}
 
-	r, w := io.Pipe()
-	defer w.Close()
+	pipeReader, pipeWriter = io.Pipe()
+	defer pipeWriter.Close()
 
 	extension := DefaultExtension
 
@@ -108,10 +120,10 @@ func (i *ImageJob) run(dev string, imgName string) error {
 	}
 
 	i.CmdIf = exec.Command(DefaultShell, "-c", commandIf)
-	i.CmdIf.Stdout = w
+	i.CmdIf.Stdout = pipeWriter
 
 	i.CmdOf = exec.Command(DefaultShell, "-c", commandOf)
-	i.CmdOf.Stdin = r
+	i.CmdOf.Stdin = pipeReader
 
 	readerStderrIf, err := i.CmdIf.StderrPipe()
 	if err != nil {
@@ -152,8 +164,10 @@ func (i *ImageJob) run(dev string, imgName string) error {
 			}
 
 			m := string(line)
+
 			if m != "" {
 				commandIfOutput.WriteString(m)
+				bufferedInput += m
 			}
 			//	fmt.Println("StderrIf: " + m)
 		}
@@ -177,6 +191,7 @@ func (i *ImageJob) run(dev string, imgName string) error {
 			m := string(line)
 			if m != "" {
 				commandOfOutput.WriteString(m)
+				bufferedOutput += m
 			}
 			//fmt.Println("StderrOf: " + m)
 		}
@@ -190,7 +205,7 @@ func (i *ImageJob) run(dev string, imgName string) error {
 		fmt.Println("Input Command ended successfully")
 	}
 	fmt.Println("Writer closing")
-	if err := w.Close(); err != nil {
+	if err := pipeWriter.Close(); err != nil {
 		fmt.Println(err)
 		return err
 	}
@@ -202,19 +217,15 @@ func (i *ImageJob) run(dev string, imgName string) error {
 		fmt.Println("Output Command ended successfully")
 	}
 
-	var hashes = HashResult{}
-
-	hashes.md5Input = md5Regex.FindString(commandIfOutput.String())
-	hashes.md5Output = md5Regex.FindString(commandOfOutput.String())
-
-	hashes.sha256Input = sha256Regex.FindString(commandIfOutput.String())
-	hashes.sha256Output = sha256Regex.FindString(commandOfOutput.String())
+	i.verfiyHashes()
 
 	fmt.Println("Done")
 	return nil
 }
 
 func (i *ImageJob) cancel() error {
+	_ = pipeWriter.Close()
+	_ = pipeReader.Close()
 	if err := i.CmdIf.Process.Kill(); err != nil {
 		return err
 
@@ -225,4 +236,19 @@ func (i *ImageJob) cancel() error {
 	}
 
 	return nil
+}
+
+func (i *ImageJob) verfiyHashes() {
+	i.Hashes.Md5Input = md5Regex.FindString(bufferedInput)
+
+	i.Hashes.Sha256Input = sha256Regex.FindString(bufferedInput)
+	i.Hashes.Md5Output = md5Regex.FindString(bufferedOutput)
+	i.Hashes.Sha256Output = sha256Regex.FindString(bufferedOutput)
+
+	if i.Hashes.Md5Output != "" && i.Hashes.Md5Output == i.Hashes.Md5Input {
+		i.HashResult.Md5Valid = true
+	}
+	if i.Hashes.Sha256Output != "" && i.Hashes.Sha256Input == i.Hashes.Sha256Output {
+		i.HashResult.Sha256Valid = true
+	}
 }

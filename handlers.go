@@ -150,8 +150,15 @@ func getImageJobById(context *gin.Context) {
 		imageJobErrorText = imageJobError.Error()
 	}
 
-	inputFileOut, outputFileOut, hashes := elem.getCachedOutput()
-	context.JSON(http.StatusOK, ImageJobPresentationType{CommandOfOutput: outputFileOut, CommandIfOutput: inputFileOut, Running: elem.Running, Id: elem.Id, Error: imageJobErrorText, Hashes: hashes})
+	inputFileOut, outputFileOut := elem.getCachedOutput()
+	context.JSON(http.StatusOK, ImageJobPresentationType{
+		CommandOfOutput: outputFileOut,
+		CommandIfOutput: inputFileOut,
+		Running:         elem.Running,
+		Id:              elem.Id,
+		Error:           imageJobErrorText,
+		Hashes:          elem.Hashes,
+		HashResult:      elem.HashResult})
 }
 
 func getStatInfo(context *gin.Context) {
@@ -166,7 +173,8 @@ type ImageJobPresentationType struct {
 	Running         bool       `json:"running"`
 	Id              string     `json:"id"`
 	Error           string     `json:"error"`
-	Hashes          HashResult `json:"hashes"`
+	Hashes          Hashes     `json:"hashes"`
+	HashResult      HashResult `json:"hash_result"`
 }
 
 type ImageJobRequestPresentationType struct {
