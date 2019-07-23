@@ -1,9 +1,6 @@
-/*
-Written by Lukas Marckmiller
-This file defines all supported routes and bind the handler func.
-
-*/
-package main
+//Written by Lukas Marckmiller
+//This file defines all supported routes and bind the handler func.
+package rfa
 
 func initRoutes() {
 	//Result is ghw.Disk or an array of ghw.Disk

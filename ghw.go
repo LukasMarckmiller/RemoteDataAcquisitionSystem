@@ -1,8 +1,6 @@
-/*
-Written by Lukas Marckmiller
-This file contains functions for block device handling based on jaypipes/gwh api.
-*/
-package main
+//Written by Lukas Marckmiller
+//This file contains functions for block device handling based on jaypipes/gwh api.
+package rfa
 
 import (
 	"fmt"

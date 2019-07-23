@@ -1,9 +1,6 @@
-/*
-Written by Lukas Marckmiller
-This file contains helper functions for network bandwidth check and transmission timings ...
-
-*/
-package main
+//Written by Lukas Marckmiller
+//This file contains helper functions for network bandwidth check and transmission timings ...
+package rfa
 
 import (
 	"fmt"

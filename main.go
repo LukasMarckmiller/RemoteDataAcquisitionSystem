@@ -1,4 +1,4 @@
-package main
+package rfa
 
 import (
 	"github.com/gin-contrib/cors"

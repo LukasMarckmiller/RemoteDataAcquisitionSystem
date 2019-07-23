@@ -1,9 +1,6 @@
-/*
-Written by Lukas Marckmiller
-This file contains the handler funcs for defined rest routes.
-
-*/
-package main
+//Written by Lukas Marckmiller
+//This file contains the handler funcs for defined rest routes.
+package rfa
 
 import (
 	"github.com/gin-gonic/gin"

@@ -1,8 +1,6 @@
-/*
-Written by Lukas Marckmiller
-This file controls the image creation and hash validation.
-*/
-package main
+//Written by Lukas Marckmiller
+//This file controls the image creation and hash validation.
+package rfa
 
 import (
 	"bufio"
