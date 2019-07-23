@@ -1,3 +1,8 @@
+/*
+Written by Lukas Marckmiller
+This file contains the handler funcs for defined rest routes.
+
+*/
 package main
 
 import (
@@ -8,10 +13,13 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
+//Cache for all active jobs
 var jobs = map[string]*ImageJob{}
 var imageJobError error
+var hashResult HashResult
 
 func showIndexPage(context *gin.Context) {
 	context.HTML(
@@ -23,22 +31,22 @@ func showIndexPage(context *gin.Context) {
 		})
 }
 
+//Handler for network bandwidth check, decides which imager is used for transmission and which output location
 func getIsRemoteTransferPossible(context *gin.Context) {
 	var device DevicePresentationType
 	var cachedOptions ImageOption
-	cachedOptions.Compressed = true
 
 	if err := context.BindJSON(&device); err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"status": http.StatusBadRequest, "message": "Bad request format."})
 		return
 	}
-	estimatedTime, err := getEstimatedTimeInSecs(device.Size, device.Name)
+	estimatedTime, err := netcheck(device.Size, device.Name)
 	if err != nil {
 		cachedOptions.Target = Local
 	} else {
 
 		cachedOptions.Target = Remote
-		fullImageTransfer := validateTime(estimatedTime)
+		fullImageTransfer := validate(estimatedTime)
 		/*
 			time := estimatedTime
 			h := time / 60 / 60
@@ -56,6 +64,7 @@ func getIsRemoteTransferPossible(context *gin.Context) {
 	context.JSON(http.StatusOK, &ImageOptionsPresentationType{cachedOptions, estimatedTime})
 }
 
+//Handler returns all plugged in block devices
 func getMedia(context *gin.Context) {
 
 	err, disks := getDisksWithoutBootPart()
@@ -66,6 +75,7 @@ func getMedia(context *gin.Context) {
 	context.JSON(http.StatusOK, disks)
 }
 
+//Handler returns free,used bytes for mountpoint
 func getDiskSpaceStatus(context *gin.Context) {
 	path := context.Params.ByName("path")
 	path, _ = url.QueryUnescape(path)
@@ -73,6 +83,7 @@ func getDiskSpaceStatus(context *gin.Context) {
 	context.JSON(http.StatusOK, getAvailableDiskSpace(path))
 }
 
+//Handler returns a list of mounted gwh.Partitions
 func getMountedMedia(context *gin.Context) {
 	err, parts := getMountPointsWithoutBoot()
 	if err != nil {
@@ -82,6 +93,7 @@ func getMountedMedia(context *gin.Context) {
 	context.JSON(http.StatusOK, parts)
 }
 
+//Handler returns mounted ghw.Partition with id
 func getMountedMediaById(context *gin.Context) {
 	err, disks := getDisksWithoutBootPart()
 	if err != nil {
@@ -103,6 +115,7 @@ func getMountedMediaById(context *gin.Context) {
 	context.JSON(http.StatusOK, disks[id])
 }
 
+//Handler starts imaging process and verify hashes
 func createAndStartImageJob(context *gin.Context) {
 	//Check disk write estimated time and set to ImageJobOptions -> part if low writetime and full if good write time
 	var imageJobRequestPresentation ImageJobRequestPresentationType
@@ -114,14 +127,19 @@ func createAndStartImageJob(context *gin.Context) {
 
 	devPath := imageJobRequestPresentation.Path
 	cachedOptions := imageJobRequestPresentation.ImageOption
+	mountTarget := imageJobRequestPresentation.Mount
 	uuidV4 := uuid.NewV4().String()
 	job := ImageJob{Id: uuidV4, Option: cachedOptions}
 
-	go func() { imageJobError = job.run(devPath, uuidV4) }()
+	go func() {
+		imageJobError = job.run(devPath, mountTarget, app.DeviceName+time.Now().Format("20060102MST030405PM"))
+		hashResult = job.verfiyHashes()
+	}()
 	jobs[job.Id] = &job
 	context.JSON(http.StatusOK, job.Id)
 }
 
+//Handler aborts image process with id
 func cancelImageJob(context *gin.Context) {
 	elem, ok := jobs[context.Param("id")]
 	if !ok {
@@ -139,6 +157,7 @@ func cancelImageJob(context *gin.Context) {
 	return
 }
 
+//Handler returns image job which contains progress information and stats.
 func getImageJobById(context *gin.Context) {
 	elem, ok := jobs[context.Param("id")]
 	if !ok {
@@ -154,13 +173,14 @@ func getImageJobById(context *gin.Context) {
 	context.JSON(http.StatusOK, ImageJobPresentationType{
 		CommandOfOutput: outputFileOut,
 		CommandIfOutput: inputFileOut,
-		Running:         elem.Running,
+		Running:         false,
 		Id:              elem.Id,
 		Error:           imageJobErrorText,
 		Hashes:          elem.Hashes,
-		HashResult:      elem.HashResult})
+		HashResult:      hashResult})
 }
 
+//Handler for stats middleware.
 func getStatInfo(context *gin.Context) {
 	context.JSON(http.StatusOK, stats.Report())
 }

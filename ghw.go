@@ -1,3 +1,7 @@
+/*
+Written by Lukas Marckmiller
+This file contains functions for block device handling based on jaypipes/gwh api.
+*/
 package main
 
 import (
@@ -13,6 +17,7 @@ type DiskSpace struct {
 	Free uint64 `json:"free"`
 }
 
+//Returns available disk space (DiskSpace) for mounted partition (path)
 func getAvailableDiskSpace(path string) (disk DiskSpace) {
 	fs := unix.Statfs_t{}
 	if err := unix.Statfs(path, &fs); err != nil {
@@ -26,6 +31,7 @@ func getAvailableDiskSpace(path string) (disk DiskSpace) {
 	return
 }
 
+//Helper function for debugging, currently not used
 func printBlockStorageInfo() {
 	block, err := ghw.Block()
 	if err != nil {
@@ -41,6 +47,8 @@ func printBlockStorageInfo() {
 	}
 }
 
+//Returns a list of ghw.Disk objects containing all available block devices.
+//The Disk containing the boot partition is filtered.
 func getDisksWithoutBootPart() (err error, disks []ghw.Disk) {
 	block, err := ghw.Block()
 	if err != nil {
@@ -68,6 +76,8 @@ func getDisksWithoutBootPart() (err error, disks []ghw.Disk) {
 	return
 }
 
+//Returns a list of ghw.Partition objects containing all partitions for all available block devices where the partition mountpoint is not null.
+//The boot Partition is filtered.
 func getMountPointsWithoutBoot() (err error, parts []ghw.Partition) {
 
 	//TODO HandleReadOnly Mounts. But dont just hide them because the user needs to know its read-only

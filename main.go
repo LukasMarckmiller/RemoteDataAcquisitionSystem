@@ -17,11 +17,14 @@ const (
 )
 
 type config struct {
-	Server string
+	Server     string
+	DeviceName string
 }
 
 func main() {
-	app = &config{"lab02@192.168.0.9"}
+	//A unique name for the device can configured. It is used as prefix for img names
+	name := os.Getenv("RFANAME")
+	app = &config{"lab02@192.168.0.9", name}
 	gin.SetMode(gin.DebugMode)
 	//Uncomment the next line if you need gin debug output like handled requests by gin
 	//gin.DefaultWriter = ioutil.Discard
@@ -52,6 +55,7 @@ func main() {
 	}
 	*/
 	port := os.Getenv("PORT")
+
 	if port == "" {
 		port = portDefault
 	}
