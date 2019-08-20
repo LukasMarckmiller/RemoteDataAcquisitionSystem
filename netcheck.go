@@ -1,6 +1,6 @@
 //Written by Lukas Marckmiller
 //This file contains helper functions for network bandwidth check and transmission timings ...
-package rfa
+package main
 
 import (
 	"fmt"
@@ -45,7 +45,7 @@ func netcheck(filesize int64, deviceName string) (int32, error) {
 //Throughput is computed by measuring the time for executing the dd command with a timeout of 10 Seconds.
 func calcThroughput(deviceName string) (throughput float64, err error) {
 	//10 MB
-	cmdctn := fmt.Sprintf("dd if=/dev/%s bs=%d count=%d | gzip | ssh -C  %v 'funzip | cat > /dev/null'", deviceName, TestByteSize, TestCount, app.Server)
+	cmdctn := fmt.Sprintf("dd if=/dev/%s bs=%d count=%d | gzip | ssh -C  %v 'gzip -d | cat > /dev/null'", deviceName, TestByteSize, TestCount, app.Server)
 	cmd := exec.Command("sh", "-c", cmdctn)
 
 	timeout := time.AfterFunc(10*time.Second, func() {
@@ -62,7 +62,6 @@ func calcThroughput(deviceName string) (throughput float64, err error) {
 	}
 	timeout.Stop()
 	//Stop timeout if finished
-	fmt.Println("Timer stopped.")
 	//Just to be sure
 	timeout = nil
 

@@ -1,6 +1,6 @@
 //Written by Lukas Marckmiller
 //This file contains functions for block device handling based on jaypipes/gwh api.
-package rfa
+package main
 
 import (
 	"fmt"
@@ -58,7 +58,7 @@ func getDisksWithoutBootPart() (err error, disks []ghw.Disk) {
 
 	for _, disk := range block.Disks {
 		for _, part := range disk.Partitions {
-			if strings.HasPrefix(part.MountPoint, "/boot") {
+			if strings.HasPrefix(part.MountPoint, "/boot") || part.MountPoint == "/" {
 				isBootPartition = true
 				break
 			}

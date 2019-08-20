@@ -1,12 +1,11 @@
 //Written by Lukas Marckmiller
 //This file contains the handler funcs for defined rest routes.
-package rfa
+package main
 
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/jaypipes/ghw"
 	"github.com/semihalev/gin-stats"
-	"github.com/twinj/uuid"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,7 +15,6 @@ import (
 //Cache for all active jobs
 var jobs = map[string]*ImageJob{}
 var imageJobError error
-var hashResult HashResult
 
 func showIndexPage(context *gin.Context) {
 	context.HTML(
@@ -30,7 +28,7 @@ func showIndexPage(context *gin.Context) {
 
 //Handler for network bandwidth check, decides which imager is used for transmission and which output location
 func getIsRemoteTransferPossible(context *gin.Context) {
-	var device DevicePresentationType
+	var device DevicePresentation
 	var cachedOptions ImageOption
 
 	if err := context.BindJSON(&device); err != nil {
@@ -58,7 +56,7 @@ func getIsRemoteTransferPossible(context *gin.Context) {
 			cachedOptions.Type = Part
 		}
 	}
-	context.JSON(http.StatusOK, &ImageOptionsPresentationType{cachedOptions, estimatedTime})
+	context.JSON(http.StatusOK, &ImageOptionsPresentation{cachedOptions, estimatedTime})
 }
 
 //Handler returns all plugged in block devices
@@ -115,7 +113,7 @@ func getMountedMediaById(context *gin.Context) {
 //Handler starts imaging process and verify hashes
 func createAndStartImageJob(context *gin.Context) {
 	//Check disk write estimated time and set to ImageJobOptions -> part if low writetime and full if good write time
-	var imageJobRequestPresentation ImageJobRequestPresentationType
+	var imageJobRequestPresentation ImageJobRequestPresentation
 
 	if err := context.BindJSON(&imageJobRequestPresentation); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"status": http.StatusBadRequest, "message": "Bad input value for imageJob."})
@@ -125,12 +123,11 @@ func createAndStartImageJob(context *gin.Context) {
 	devPath := imageJobRequestPresentation.Path
 	cachedOptions := imageJobRequestPresentation.ImageOption
 	mountTarget := imageJobRequestPresentation.Mount
-	uuidV4 := uuid.NewV4().String()
-	job := ImageJob{Id: uuidV4, Option: cachedOptions}
+	imgName := app.DeviceName + time.Now().Format("20060102MST030405PM")
+	job := ImageJob{Id: imgName, Option: cachedOptions}
 
 	go func() {
-		imageJobError = job.run(devPath, mountTarget, app.DeviceName+time.Now().Format("20060102MST030405PM"))
-		hashResult = job.verfiyHashes()
+		imageJobError = job.run(devPath, mountTarget, imgName)
 	}()
 	jobs[job.Id] = &job
 	context.JSON(http.StatusOK, job.Id)
@@ -167,14 +164,14 @@ func getImageJobById(context *gin.Context) {
 	}
 
 	inputFileOut, outputFileOut := elem.getCachedOutput()
-	context.JSON(http.StatusOK, ImageJobPresentationType{
+	context.JSON(http.StatusOK, ImageJobPresentation{
 		CommandOfOutput: outputFileOut,
 		CommandIfOutput: inputFileOut,
-		Running:         false,
+		Running:         elem.Running,
 		Id:              elem.Id,
 		Error:           imageJobErrorText,
 		Hashes:          elem.Hashes,
-		HashResult:      hashResult})
+		HashResult:      elem.HashResult})
 }
 
 //Handler for stats middleware.
@@ -184,7 +181,7 @@ func getStatInfo(context *gin.Context) {
 
 //TODO Implement cache cleaning for ImageJobs
 
-type ImageJobPresentationType struct {
+type ImageJobPresentation struct {
 	CommandOfOutput string     `json:"commandOfOutput"`
 	CommandIfOutput string     `json:"commandIfOutput"`
 	Running         bool       `json:"running"`
@@ -194,18 +191,18 @@ type ImageJobPresentationType struct {
 	HashResult      HashResult `json:"hash_result"`
 }
 
-type ImageJobRequestPresentationType struct {
+type ImageJobRequestPresentation struct {
 	Path        string        `json:"path"`
 	ImageOption ImageOption   `json:"image_option"`
 	Mount       ghw.Partition `json:"mount"`
 }
 
-type DevicePresentationType struct {
+type DevicePresentation struct {
 	Name string `json:"name"`
 	Size int64  `json:"size"`
 }
 
-type ImageOptionsPresentationType struct {
+type ImageOptionsPresentation struct {
 	ImageOption   ImageOption `json:"image_option"`
 	EstimatedSecs int32       `json:"estimated_secs"`
 }

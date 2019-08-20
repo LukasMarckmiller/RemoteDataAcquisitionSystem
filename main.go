@@ -1,4 +1,4 @@
-package rfa
+package main
 
 import (
 	"github.com/gin-contrib/cors"
@@ -24,7 +24,7 @@ type config struct {
 func main() {
 	//A unique name for the device can configured. It is used as prefix for img names
 	name := os.Getenv("RFANAME")
-	app = &config{"lab02@192.168.0.9", name}
+	app = &config{"root@192.168.0.13", name}
 	gin.SetMode(gin.DebugMode)
 	//Uncomment the next line if you need gin debug output like handled requests by gin
 	//gin.DefaultWriter = ioutil.Discard
@@ -55,7 +55,6 @@ func main() {
 	}
 	*/
 	port := os.Getenv("PORT")
-
 	if port == "" {
 		port = portDefault
 	}

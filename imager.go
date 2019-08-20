@@ -1,6 +1,6 @@
 //Written by Lukas Marckmiller
 //This file controls the image creation and hash validation.
-package rfa
+package main
 
 import (
 	"bufio"
@@ -13,12 +13,13 @@ import (
 )
 
 type ImageJob struct {
-	Running bool        `json:"running"`
-	Id      string      `json:"id"`
-	Option  ImageOption `json:"option"`
-	CmdIf   *exec.Cmd   `json:"cmd_if"`
-	CmdOf   *exec.Cmd   `json:"cmd_of"`
-	Hashes  Hashes      `json:"hashes"`
+	Running    bool        `json:"running"`
+	Id         string      `json:"id"`
+	Option     ImageOption `json:"option"`
+	CmdIf      *exec.Cmd   `json:"cmd_if"`
+	CmdOf      *exec.Cmd   `json:"cmd_of"`
+	Hashes     Hashes      `json:"hashes"`
+	HashResult HashResult  `json:"hash_result"`
 }
 
 type ImageOption struct {
@@ -58,8 +59,8 @@ var (
 	commandOfOutput strings.Builder
 
 	//Used for logging. Contains complete Output
-	bufferedOutput string
-	bufferedInput  string
+	bufferedOutput strings.Builder
+	bufferedInput  strings.Builder
 	pipeWriter     *io.PipeWriter
 	pipeReader     *io.PipeReader
 )
@@ -119,7 +120,7 @@ func (i *ImageJob) run(dev string, mountTarget ghw.Partition, imgName string) er
 			extension += ".gz"
 			commandOf = fmt.Sprintf("ssh %s -C '%s hash=sha256 hash=md5 hlog=%s.hash %s %s%s%s'", app.Server, AquisitionTool, imgName, OutputArgs, OutputFileArgs, imgName, extension)
 		} else {
-			commandOf = fmt.Sprintf("ssh %s -C 'funzip | %s hash=sha256 hash=md5 hlog=%s.hash %s %s%s%s'", app.Server, AquisitionTool, imgName, OutputArgs, OutputFileArgs, imgName, extension)
+			commandOf = fmt.Sprintf("ssh %s -C 'gzip -d | %s hash=sha256 hash=md5 hlog=%s.hash %s %s%s%s'", app.Server, AquisitionTool, imgName, OutputArgs, OutputFileArgs, imgName, extension)
 		}
 	} else {
 		//Compress local image if option is set
@@ -130,6 +131,7 @@ func (i *ImageJob) run(dev string, mountTarget ghw.Partition, imgName string) er
 		commandOf = fmt.Sprintf("%s hash=sha256 hash=md5 hlog=%s.hash  %s %s%s%s", AquisitionTool, imgName, OutputArgs, OutputFileArgs, imgName, extension)
 	}
 
+	fmt.Println(commandIf, commandOf)
 	i.CmdIf = exec.Command(DefaultShell, "-c", commandIf)
 	i.CmdIf.Stdout = pipeWriter
 
@@ -178,7 +180,7 @@ func (i *ImageJob) run(dev string, mountTarget ghw.Partition, imgName string) er
 
 			if m != "" {
 				commandIfOutput.WriteString(m)
-				bufferedInput += m
+				bufferedInput.WriteString(m)
 			}
 			//	fmt.Println("StderrIf: " + m)
 		}
@@ -202,7 +204,7 @@ func (i *ImageJob) run(dev string, mountTarget ghw.Partition, imgName string) er
 			m := string(line)
 			if m != "" {
 				commandOfOutput.WriteString(m)
-				bufferedOutput += m
+				bufferedOutput.WriteString(m)
 			}
 			//fmt.Println("StderrOf: " + m)
 		}
@@ -229,7 +231,7 @@ func (i *ImageJob) run(dev string, mountTarget ghw.Partition, imgName string) er
 	}
 
 	//TODO Transfer Hash Log to Server
-
+	i.HashResult = i.verfiyHashes()
 	fmt.Println("Done")
 	return nil
 }
@@ -254,11 +256,10 @@ func (i *ImageJob) cancel() error {
 //Is called after Image is successfully created.
 //Checks if both hashes are equal for the input and the created image.
 func (i *ImageJob) verfiyHashes() (hashResult HashResult) {
-	i.Hashes.Md5Input = md5Regex.FindString(bufferedInput)
-
-	i.Hashes.Sha256Input = sha256Regex.FindString(bufferedInput)
-	i.Hashes.Md5Output = md5Regex.FindString(bufferedOutput)
-	i.Hashes.Sha256Output = sha256Regex.FindString(bufferedOutput)
+	i.Hashes.Md5Input = md5Regex.FindString(bufferedInput.String())
+	i.Hashes.Sha256Input = sha256Regex.FindString(bufferedInput.String())
+	i.Hashes.Md5Output = md5Regex.FindString(bufferedOutput.String())
+	i.Hashes.Sha256Output = sha256Regex.FindString(bufferedOutput.String())
 
 	if i.Hashes.Md5Output != "" && i.Hashes.Md5Output == i.Hashes.Md5Input {
 		hashResult.Md5Valid = true
