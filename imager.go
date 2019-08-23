@@ -128,7 +128,7 @@ func (i *ImageJob) run(dev string, mountTarget ghw.Partition, imgName string) er
 			commandIf += " | gzip -c -1"
 			extension += ".gz"
 		}
-		commandOf = fmt.Sprintf("%s hash=sha256 hash=md5 hlog=%s.hash  %s %s%s%s", AquisitionTool, imgName, OutputArgs, OutputFileArgs, imgName, extension)
+		commandOf = fmt.Sprintf("%s hash=sha256 hash=md5 hlog=%s.hash  %s %s%s%s", AquisitionTool, imgName, OutputArgs, OutputFileArgs, mountTarget.MountPoint+"/"+imgName, extension)
 	}
 
 	fmt.Println(commandIf, commandOf)

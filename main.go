@@ -24,7 +24,12 @@ type config struct {
 func main() {
 	//A unique name for the device can configured. It is used as prefix for img names
 	name := os.Getenv("RFANAME")
-	app = &config{"root@192.168.0.13", name}
+	server := os.Getenv("RFASERVER")
+	if server == "" {
+		//Set default
+		server = "root@192.168.0.13"
+	}
+	app = &config{server, name}
 	gin.SetMode(gin.DebugMode)
 	//Uncomment the next line if you need gin debug output like handled requests by gin
 	//gin.DefaultWriter = ioutil.Discard
@@ -34,7 +39,7 @@ func main() {
 	router.LoadHTMLFiles("web/index.html")
 	router.Static("/css", "web/css")
 	router.Static("/js", "web/js")
-
+	router.Static("/fonts", "web/fonts")
 	/*USE ONLY FOR LAB ENVIRONMENT, BUILD OWN CONFIG FOR PRODUCTIVE BUILD:
 	https://github.com/gin-contrib/cors*/
 	router.Use(cors.Default())
