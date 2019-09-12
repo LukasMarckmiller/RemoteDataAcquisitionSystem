@@ -59,7 +59,7 @@ func main() {
 		fmt.Printf(disk.String())l
 	}
 	*/
-	port := os.Getenv("PORT")
+	port := os.Getenv("RFAPORT")
 	if port == "" {
 		port = portDefault
 	}
