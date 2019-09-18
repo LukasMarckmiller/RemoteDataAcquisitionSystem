@@ -27,7 +27,7 @@ func main() {
 	server := os.Getenv("RFASERVER")
 	if server == "" {
 		//Set default
-		server = "root@192.168.0.13"
+		server = "odroid@192.168.0.11"
 	}
 	app = &config{server, name}
 	gin.SetMode(gin.DebugMode)

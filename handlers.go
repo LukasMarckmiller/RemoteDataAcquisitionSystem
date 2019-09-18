@@ -35,6 +35,7 @@ func getIsRemoteTransferPossible(context *gin.Context) {
 		context.JSON(http.StatusInternalServerError, gin.H{"status": http.StatusBadRequest, "message": "Bad request format."})
 		return
 	}
+	cachedOptions = device.ImageOptionsPresentation.ImageOption
 	estimatedTime, err := netcheck(device.Size, device.Name)
 	if err != nil {
 		cachedOptions.Target = Local
@@ -198,8 +199,9 @@ type ImageJobRequestPresentation struct {
 }
 
 type DevicePresentation struct {
-	Name string `json:"name"`
-	Size int64  `json:"size"`
+	Name                     string                   `json:"name"`
+	Size                     int64                    `json:"size"`
+	ImageOptionsPresentation ImageOptionsPresentation `json:"image_options_presentation"`
 }
 
 type ImageOptionsPresentation struct {

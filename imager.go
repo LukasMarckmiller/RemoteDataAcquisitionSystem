@@ -232,6 +232,8 @@ func (i *ImageJob) run(dev string, mountTarget ghw.Partition, imgName string) er
 
 	//TODO Transfer Hash Log to Server
 	i.HashResult = i.verfiyHashes()
+	bufferedOutput.Reset()
+	bufferedInput.Reset()
 	fmt.Println("Done")
 	return nil
 }
@@ -267,6 +269,5 @@ func (i *ImageJob) verfiyHashes() (hashResult HashResult) {
 	if i.Hashes.Sha256Output != "" && i.Hashes.Sha256Input == i.Hashes.Sha256Output {
 		hashResult.Sha256Valid = true
 	}
-
 	return hashResult
 }
